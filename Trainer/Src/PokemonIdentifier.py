@@ -71,7 +71,7 @@ if os.path.isdir(TRAIN_DIR) is False:
 if os.path.isdir(VALIDATION_DIR) is False:
     print('VALIDATION SET NOT FOUND')
 
-BATCH_SIZE = 600
+BATCH_SIZE = 512
 
 NUM_EPOCHS = 10
 
