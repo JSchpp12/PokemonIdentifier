@@ -71,7 +71,7 @@ if os.path.isdir(TRAIN_DIR) is False:
 if os.path.isdir(VALIDATION_DIR) is False:
     print('VALIDATION SET NOT FOUND')
 
-BATCH_SIZE = 512
+BATCH_SIZE = 300
 
 NUM_EPOCHS = 10
 
@@ -86,6 +86,7 @@ IMAGE_NORM_COLOR = 255
 # %%
 PIPE_USE_RAND_ZOOM = True
 PIPE_RAND_ZOOM_AMT = (-0.5, 0.5)
+PIPE_USE_CACHE = False
 
 # %% [markdown]
 # ### Training Params
@@ -93,7 +94,7 @@ PIPE_RAND_ZOOM_AMT = (-0.5, 0.5)
 # %%
 NUM_NODES_IN_CONV = [128]
 NUM_LAYERS_CONV = [3]
-CONV_KERNEL_SIZE = [(4,4)]
+CONV_KERNEL_SIZE = (3,3)
 REGULARIZER_USE = True
 REGULARIZER_LEARNING_RATE = 0.01
 USE_BATCH_NORMS = True
@@ -117,6 +118,9 @@ if (len(sys.argv) > 0):
                 print(f'time limit set to- {trainTimeLimit} seconds') 
         elif splitArg[0] == "epochs":
             numEpochs = int(splitArg[1])
+        elif splitArg[0] == "cache":
+            PIPE_USE_CACHE = bool(splitArg[1])
+            print('Will utilize caching for dataset')
 
 # %% [markdown]
 # ## Train
@@ -180,6 +184,10 @@ trainDS = (trainDS
            .shuffle(len(trainPaths)) #shuffle all the images 
            .map(loadImages, num_parallel_calls=AUTOTUNE) #read images from disk 
            .map(lambda x, y: (seqAugment(x), y), num_parallel_calls=AUTOTUNE)
+        )
+if PIPE_USE_CACHE is True: 
+    trainDS = trainDS.cache()
+trainDS = (trainDS
            .batch(BATCH_SIZE) #batch size
            .prefetch(AUTOTUNE)
           )
@@ -189,8 +197,13 @@ trainDS = (trainDS
 valDS = tf.data.Dataset.from_tensor_slices(valPaths)
 valDS = (valDS
          .map(loadImages, num_parallel_calls=AUTOTUNE)
+        )
+if PIPE_USE_CACHE is True:
+    valDS = valDS.cache()
+valDS = (valDS
          .batch(BATCH_SIZE)
-         .prefetch(AUTOTUNE))
+         .prefetch(AUTOTUNE)
+         )
 # valDS = valDS.map(lambda x, y: (normalizationLayer(x), y))
 
 # %%
