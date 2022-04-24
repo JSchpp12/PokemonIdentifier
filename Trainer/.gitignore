@@ -1,6 +1,7 @@
 *.log
 *.zip
 .ipynb_checkpoints
-Datasets/
+Datasets/Images/
+Datasets/Main/
 Logs/
 Tmp/
