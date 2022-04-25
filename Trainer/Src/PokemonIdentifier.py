@@ -20,6 +20,7 @@ from tensorflow.data import AUTOTUNE
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras import regularizers
 import tensorflow_addons as tfa
 from imutils import paths #used to get the paths of all images in a dir
 
@@ -32,11 +33,11 @@ import matplotlib.pyplot as plt
 # %%
 clearLogs = False
 strNow = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-ENV = "windowsLocal"
+ENV = "ubuntuLocal"
 
 #path to dataset directory
 ENV_LOG_DIR = f"../Logs/{ENV}/"
-SESSION_LOG_DIR = f"../Logs/windowsLocal/{strNow}/"
+SESSION_LOG_DIR = f"../Logs/{ENV}/{strNow}/"
 CORE_DATASET = '../Datasets/Main/Images/'
 TRAIN_DIR = '../Datasets/Main/Images/Train/'
 VALIDATION_DIR = '../Datasets/Main/Images/Validation/'
@@ -70,22 +71,32 @@ if os.path.isdir(TRAIN_DIR) is False:
 if os.path.isdir(VALIDATION_DIR) is False:
     print('VALIDATION SET NOT FOUND')
 
-BATCH_SIZE = 32
+BATCH_SIZE = 512
 
-NUM_EPOCHS = 20
+NUM_EPOCHS = 10
 
-IMAGE_HEIGHT = 160
-IMAGE_WIDTH = 160
+IMAGE_HEIGHT = 70
+IMAGE_WIDTH = 70
 #normalization value that will be used for color channels
 IMAGE_NORM_COLOR = 255 
 
-#should extras -- such as tensorboard be loaded for this session 
-LOAD_UTILS = True
+# %% [markdown]
+# ### Data Pipeline Params
 
 # %%
-#tensorflow training params
+PIPE_USE_RAND_ZOOM = True
+PIPE_RAND_ZOOM_AMT = (-0.5, 0.5)
+
+# %% [markdown]
+# ### Training Params
+
+# %%
 NUM_NODES_IN_CONV = [128]
 NUM_LAYERS_CONV = [3]
+CONV_KERNEL_SIZE = (4,4)
+REGULARIZER_USE = True
+REGULARIZER_LEARNING_RATE = 0.01
+USE_BATCH_NORMS = True
 
 # %% [markdown]
 # ### Take command line arguments if any
@@ -106,20 +117,6 @@ if (len(sys.argv) > 0):
                 print(f'time limit set to- {trainTimeLimit} seconds') 
         elif splitArg[0] == "epochs":
             numEpochs = int(splitArg[1])
-        elif splitArg[0] == "loadextras":
-            LOAD_UTILS = bool(splitArg[1])
-            print('Wont load extras')
-        
-
-# %%
-# if (LOAD_UTILS):
-#     %load_ext tensorboard
-#     %tensorboard --logdir '../Logs/ubuntuLocal/fit/' --bind_all
-#     %matplotlib inline
-
-# %%
-# parser = argparse.ArgumentParser()
-# parser.add_argument('timeLimit', type=int, 
 
 # %% [markdown]
 # ## Train
@@ -141,72 +138,27 @@ if (len(sys.argv) > 0):
 # ]
 
 # %%
-# def loadDataFromDir(folder): 
-#     def parseImage(imagePath):
-#         #get folder structure 
-#         directoryStruct = tf.strings.split(imagePath, os.path.sep)
-#         classNames = np.array(trainDirectory)
-#         label = directoryStruct[-2] == classNames 
-        
-#         img = tf.io.read_file(imagePath)
-
-# %%
-# def buildDataset(datasetPath: string): 
-#     coreDir = None
-    
-#     if train is True: 
-#         coreDir = TRAIN_DIR
-#     else:
-#         coreDir = TEST_DIR
-    
-#     for curDur in os.listdir(datasetPath):
-#         for file in os.listdir(os.path.join(datasetPath, curDur)):
-            
-
-# %%
-# imageWriterCounter = 0
-# def writeImages(imagePath):
-#     image = tf.io.read_file(imagePath)
-#     image = tf.image.decode_image(image, channels=4)
-    
-
-# %%
 def loadImages(imagePath):
     #encode the image
     # tf.print(imagePath)
     image = tf.io.read_file(imagePath)
     image = tf.image.decode_png(image, channels=4)
     image = tf.image.resize_with_pad(image, IMAGE_HEIGHT, IMAGE_WIDTH)
+    image = tf.cast(image, tf.float32)
     
     #encode the label for the image
     labelParts = tf.strings.split(imagePath, os.sep)
     oneHot = labelParts[-2] == classNames 
-
     return (image, tf.argmax(oneHot))
-
-# %%
-#function decorator -- instructs tensorflow to convert this function to a TensorFlow-callable graph
-@tf.function
-def augment(image, label):
-    image = tf.image.random_flip_up_down(image)
-    image = tf.image.random_flip_left_right(image)
-    # image = preprocessing.random_zoom(
-    #     image,
-    #     zoom_range=(0.15, 0.20))
-    image = preprocessing.random_shear(
-        image, 
-        intensity=40)
-    return (image, label)
 
 # %%
 seqAugment = tf.keras.models.Sequential([
     tf.keras.layers.Rescaling(scale=1.0/255),
     tf.keras.layers.RandomZoom(
-        height_factor=(-0.15, 0.10), #zoom in by random ammount from +20% to +30%
-        width_factor=(-0.15, 0.10), 
+        height_factor=PIPE_RAND_ZOOM_AMT, #zoom in by random ammount from +20% to +30%
+        width_factor=PIPE_RAND_ZOOM_AMT, 
         fill_mode='constant', 
         fill_value=0)
-        
 ])
 
 # %%
@@ -226,13 +178,11 @@ normalizationLayer = tf.keras.layers.Rescaling(1./255)
 trainDS = tf.data.Dataset.from_tensor_slices(trainPaths)
 trainDS = (trainDS
            .shuffle(len(trainPaths)) #shuffle all the images 
-           #map applies a function to all contents -- 
            .map(loadImages, num_parallel_calls=AUTOTUNE) #read images from disk 
            .map(lambda x, y: (seqAugment(x), y), num_parallel_calls=AUTOTUNE)
-           # .map(augment, num_parallel_calls=AUTOTUNE) #apply augments to images
            .batch(BATCH_SIZE) #batch size
            .prefetch(AUTOTUNE)
-          ) #prefetch tells the CPU to begin preparing next batch of data when the GPU is almost ready for it 
+          )
 
 # trainDS = trainDS.map(lambda x, y: (normalizationLayer(x), y))
 #validation dataset
@@ -241,172 +191,124 @@ valDS = (valDS
          .map(loadImages, num_parallel_calls=AUTOTUNE)
          .batch(BATCH_SIZE)
          .prefetch(AUTOTUNE))
-valDS = valDS.map(lambda x, y: (normalizationLayer(x), y))
-
-# %%
-# tempDS = trainDS.make_one_shot_iterator
-
-# %%
-# print(classNames)
-
-# %%
-# normTrainDS.element_spec
-
-# %%
-# for images, label in trainDS.take(40):
-#     print(images.shape)
-#     print(label.shape)
+# valDS = valDS.map(lambda x, y: (normalizationLayer(x), y))
 
 # %%
 # print(trainPaths[15061])
-if (LOAD_UTILS):
-  for images, labels in trainDS.take(1):
+for images, labels in trainDS.take(1):
     for i in range(9):
-      ax = plt.subplot(3, 3, i + 1)
-      plt.imshow((images[i].numpy()*255).astype("uint8"))
-      plt.title(classNames[labels[i]])
-      plt.axis("off")
+        ax = plt.subplot(3, 3, i + 1)
+        plt.imshow((images[i].numpy()*255).astype("uint8"))
+        plt.title(classNames[labels[i]])
+        plt.axis("off")
     plt.show()
-    
-
-# %%
-# print(DEBUG_COUNTER)
 
 # %% [markdown]
 # ### Create Datagenerators
-
-# %%
-# train_datagen = ImageDataGenerator(rescale = 1.0/255.0, #this is to normalize colors
-#                                   rotation_range=10, 
-#                                   width_shift_range=0.1, 
-#                                   height_shift_range=0.1,
-#                                   shear_range=0.05, 
-#                                   zoom_range=0.2, 
-#                                   horizontal_flip = False, 
-#                                   fill_mode='nearest'
-#                                   )
-
-# train_generator = train_datagen.flow_from_directory(directory=trainDirectory, 
-#                                                     target_size=(150, 150), #resize image resolution
-#                                                     color_mode='rgba',
-#                                                     save_format='png',
-#                                                     batch_size=16, 
-#                                                     class_mode='sparse')
-
-# %%
-# validation_datagen = ImageDataGenerator(rescale=1.0/255.0) 
-
-# validation_generator = validation_datagen.flow_from_directory(directory=testDirectory,
-#                                                               target_size=(150, 150), #resize image resolution
-#                                                               color_mode='rgba',
-#                                                               save_format='png',
-#                                                               batch_size=16, 
-#                                                               class_mode='sparse')
 
 # %% [markdown]
 # ### Define Model
 
 # %%
-# #test for viewing images 
-# file_writer = tf.summary.create_file_writer("./Tmp")
-# image = tf.io.read_file(trainPaths[0])
-# image = tf.image.decode_image(image, channels=4, expand_animations=False)
-# image = np.reshape
-# print(image.shape)
-
-# %%
-print(len(classNames))
-
-# %%
 for numConvLayers in NUM_LAYERS_CONV:
     for convNodes in NUM_NODES_IN_CONV:
-        local_container_dir = os.path.join(SESSION_LOG_DIR, f"cl{numConvLayers}.cn{convNodes}")
-        local_tensorlogs_dir = os.path.join(local_container_dir, 'fit')
-        local_save_dir = os.path.join(local_container_dir, 'saves')
-        local_checkpoint_dir = os.path.join(local_save_dir, 'checkpoints/')
-        local_finalsave_dir = os.path.join(local_save_dir, 'final/')
+        for convKernelSize in CONV_KERNEL_SIZE:
+            local_container_dir = os.path.join(SESSION_LOG_DIR, f"cl{numConvLayers}.cn{convNodes}.ckern{convKernelSize}")
+            print(local_container_dir)
+            local_tensorlogs_dir = os.path.join(local_container_dir, 'fit')
+            local_save_dir = os.path.join(local_container_dir, 'saves')
+            local_checkpoint_dir = os.path.join(local_save_dir, 'checkpoints/')
+            local_finalsave_dir = os.path.join(local_save_dir, 'final/')
 
-        if os.path.isdir(local_container_dir) is False: 
-            os.mkdir(local_container_dir)
-        if os.path.isdir(local_save_dir) is False:
-            os.mkdir(local_save_dir)
-        if os.path.isdir(local_checkpoint_dir) is False:
-            os.mkdir(local_checkpoint_dir)
-        if os.path.isdir(local_finalsave_dir) is False: 
-            os.mkdir(local_finalsave_dir)
+            if os.path.isdir(local_container_dir) is False: 
+                os.mkdir(local_container_dir)
+            if os.path.isdir(local_save_dir) is False:
+                os.mkdir(local_save_dir)
+            if os.path.isdir(local_checkpoint_dir) is False:
+                os.mkdir(local_checkpoint_dir)
+            if os.path.isdir(local_finalsave_dir) is False: 
+                os.mkdir(local_finalsave_dir)
 
-        #write summary to file 
-        infoFile = os.path.join(local_container_dir, "into.txt")
-        with open(infoFile, 'w') as file: 
-            file.write(f"Number of convolution layers: {numConvLayers} \r")
-            file.write(f"Number of nodes per convolution layer: {convNodes} \r")
-            file.write(f"Input size expected: {IMAGE_WIDTH}, {IMAGE_HEIGHT}\r")
-            file.write(f"Epochs: {NUM_EPOCHS}\r")
-            file.write(f"Additional Notes: trying to increase end accurracy with wider range of zoom (-15, 10)\r")
-            file.close()
+            #write summary to file 
+            infoFile = os.path.join(local_container_dir, "into.txt")
+            with open(infoFile, 'w') as file: 
+                file.write(f"Number of convolution layers: {numConvLayers} \r")
+                file.write(f"Number of nodes per convolution layer: {convNodes} \r")
+                file.write(f"Input size expected: {IMAGE_WIDTH}, {IMAGE_HEIGHT}\r")
+                file.write(f"Epochs: {NUM_EPOCHS}\r")
+                file.write(f"Regularizers in use? {REGULARIZER_USE}\r")
+                file.write(f"Regularizer learning rate: 0.01\r")
+                file.write(f"Conv kernel size: {convKernelSize}\r")
+                file.close()
 
-        #cleanup from last round 
-        tf.keras.backend.clear_session()
+            #cleanup from last round 
+            tf.keras.backend.clear_session()
 
-        #define the model 
-        model = tf.keras.models.Sequential()
-        for i in range(numConvLayers):
-            model.add(tf.keras.layers.Conv2D(int(convNodes), (3,3)))
-            model.add(tf.keras.layers.BatchNormalization())
-            model.add(tf.keras.layers.Activation('relu'))
-            model.add(tf.keras.layers.MaxPool2D((2,2)))
+            #define the model 
+            model = tf.keras.models.Sequential()
+            for i in range(numConvLayers):
+                if REGULARIZER_USE is True:
+                    model.add(tf.keras.layers.Conv2D(int(convNodes),
+                                                        convKernelSize,
+                                                        activation='relu',
+                                                        kernel_regularizer=regularizers.l2(REGULARIZER_LEARNING_RATE)))
+                else:
+                    model.add(tf.keras.layers.Conv2D(int(convNodes), convKernelSize, activation='relu'))
+                
+                #add additional properties to conv layers 
+                if USE_BATCH_NORMS is True:
+                    model.add(tf.keras.layers.BatchNormalization())
 
-        #flatten out 
-        model.add(tf.keras.layers.Flatten())
-        model.add(tf.keras.layers.Dense(512, activation='relu'))
-        model.add(tf.keras.layers.Dense(len(classNames), activation='softmax'))
-        
-        model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                optimizer=RMSprop(learning_rate=1e-4),
-                metrics=['accuracy'])
-        
-        #create callbacks as necessary
-        checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=local_checkpoint_dir, 
-                                                                save_weights_only=True, 
-                                                                verbose=1)
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=local_tensorlogs_dir,                        
-                                                            histogram_freq=1, 
-                                                            write_graph=True, 
-                                                            write_images=False, 
-                                                            embeddings_freq=1, 
-                                                            profile_batch='1,5')
+                model.add(tf.keras.layers.MaxPool2D((2,2)))
+
+            #flatten out 
+            model.add(tf.keras.layers.Flatten())
+            model.add(tf.keras.layers.Dense(512, activation='relu'))
+            model.add(tf.keras.layers.Dense(len(classNames), activation='softmax'))
             
-        time_stopping_callback = None
-        history = None
-        
-        if (trainTimeLimit != 0):
-            #shorten the time limit to allow for post training data processing
-            trainTimeLimit = trainTimeLimit - (60*5) 
-            time_stopping_callback = tfa.callbacks.TimeStopping(seconds=TrainTimeLimit, verbose=1)
-            history = model.fit(trainDS, 
-                                epochs=1, 
-                                validation_data=valDS,
-                                callbacks=[tensorboard_callback, checkpoint_callback, time_stopping_callback])
-        else:
-            #no time limit callback
-            history = model.fit(trainDS, 
-                        epochs=NUM_EPOCHS, 
-                        validation_data=valDS,
-                        callbacks=[tensorboard_callback, checkpoint_callback])
+            model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                    optimizer=RMSprop(learning_rate=1e-4),
+                    metrics=['accuracy'])
+            
+            #create callbacks as necessary
+            checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=local_checkpoint_dir, 
+                                                                    save_weights_only=True, 
+                                                                    verbose=1)
+            tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=local_tensorlogs_dir,                        
+                                                                histogram_freq=1, 
+                                                                write_graph=True, 
+                                                                write_images=False, 
+                                                                embeddings_freq=1, 
+                                                                profile_batch='1,5')
+                
+            time_stopping_callback = None
+            history = None
+            
+            if (trainTimeLimit != 0):
+                #shorten the time limit to allow for post training data processing
+                trainTimeLimit = trainTimeLimit - (60*5) 
+                time_stopping_callback = tfa.callbacks.TimeStopping(seconds=trainTimeLimit, verbose=1)
+                history = model.fit(trainDS, 
+                                    epochs=NUM_EPOCHS, 
+                                    validation_data=valDS,
+                                    callbacks=[tensorboard_callback, checkpoint_callback, time_stopping_callback])
+            else:
+                #no time limit callback
+                history = model.fit(trainDS, 
+                            epochs=NUM_EPOCHS, 
+                            validation_data=valDS,
+                            callbacks=[tensorboard_callback, checkpoint_callback])
 
-        #save model and record completion in info file
-        model.save(local_finalsave_dir)
-        with open(infoFile, 'a') as file: 
-            file.write('Training Complete')
-            file.close()
+            #save model and record completion in info file
+            model.save(local_finalsave_dir)
+            with open(infoFile, 'a') as file: 
+                file.write('Training Complete')
+                file.close()
 
 # %% [markdown]
 # #### Zip Logs For Download
 
 # %%
 shutil.make_archive('Logs', 'zip', '../Logs')
-
-# %%
-
 
 
