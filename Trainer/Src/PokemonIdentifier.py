@@ -71,7 +71,7 @@ if os.path.isdir(TRAIN_DIR) is False:
 if os.path.isdir(VALIDATION_DIR) is False:
     print('VALIDATION SET NOT FOUND')
 
-BATCH_SIZE = 300
+BATCH_SIZE = 250
 
 NUM_EPOCHS = 10
 
@@ -121,6 +121,8 @@ if (len(sys.argv) > 0):
         elif splitArg[0] == "cache":
             PIPE_USE_CACHE = bool(splitArg[1])
             print('Will utilize caching for dataset')
+        elif splitArg[0] == "batchNorm":
+            USE_BATCH_NORMS = bool(splitArg[1])
 
 # %% [markdown]
 # ## Train
@@ -267,16 +269,21 @@ for numConvLayers in NUM_LAYERS_CONV:
                                                         kernel_regularizer=regularizers.l2(REGULARIZER_LEARNING_RATE)))
                 else:
                     model.add(tf.keras.layers.Conv2D(int(convNodes), convKernelSize, activation='relu'))
-                
-                #add additional properties to conv layers 
                 if USE_BATCH_NORMS is True:
                     model.add(tf.keras.layers.BatchNormalization())
-
+                    
+                #add additional properties to conv layers
                 model.add(tf.keras.layers.MaxPool2D((2,2)))
+                if USE_BATCH_NORMS is True:
+                    model.add(tf.keras.layers.BatchNormalization())
 
             #flatten out 
             model.add(tf.keras.layers.Flatten())
             model.add(tf.keras.layers.Dense(512, activation='relu'))
+            
+            if USE_BATCH_NORMS is True: 
+                model.add(tf.keras.layers.BatchNormalization())
+                
             model.add(tf.keras.layers.Dense(len(classNames), activation='softmax'))
             
             model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
