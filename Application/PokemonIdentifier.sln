@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Database", "Database\Databa
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "Common\Common.csproj", "{E2213538-44C7-4A34-B65B-AB33F78C35C9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebHelper", "WebHelper\WebHelper.csproj", "{6ADEA36A-73E5-4F08-AC18-49DB4BEF37C1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Models", "WebHelper\Models.csproj", "{6ADEA36A-73E5-4F08-AC18-49DB4BEF37C1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

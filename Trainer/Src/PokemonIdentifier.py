@@ -70,7 +70,11 @@ NUM_EPOCHS = 7
 IMAGE_HEIGHT = 80
 IMAGE_WIDTH = 80
 #normalization value that will be used for color channels
+<<<<<<< HEAD
 IMAGE_NORM_COLOR = 150 
+=======
+IMAGE_NORM_COLOR = 255 
+>>>>>>> 09ca6b515c8a307dd3bf7e194e10eec511be6dd9
 
 # %% [markdown]
 # ### Data Pipeline Params
@@ -89,10 +93,17 @@ PIPE_RATIO_VALID = 1 - PIPE_RATIO_TRAIN
 NUM_NODES_IN_CONV = [32]
 NUM_LAYERS_CONV = [4]
 CONV_KERNEL_SIZE = [(2,2)]
+<<<<<<< HEAD
 REGULARIZER_LEARNING_RATE = [float(0.001)]
 USE_BATCH_NORMS = [True]
 DROPOUT_RATE = [0.6]    #use same number of elements in list for all dropout args
 DROPOUT_RATE_HIDDEN = [0.6]
+=======
+REGULARIZER_LEARNING_RATE = [0.001]
+USE_BATCH_NORMS = [True]
+DROPOUT_RATE = [0.5]    #use same number of elements in list for all dropout args
+DROPOUT_RATE_HIDDEN = [0.5]
+>>>>>>> 09ca6b515c8a307dd3bf7e194e10eec511be6dd9
 SPATIAL_DROPOUT_USE = False
 SPATIAL_DROPOUT_RATE = 0.5
 
@@ -227,7 +238,11 @@ for useBatchNorms in USE_BATCH_NORMS:
                         counter += 1
                         
                         local_useReg = False
+<<<<<<< HEAD
                         if regIndex is not None and REGULARIZER_LEARNING_RATE[regIndex] > 0.0:
+=======
+                        if regIndex is not None and regIndex != 0:
+>>>>>>> 09ca6b515c8a307dd3bf7e194e10eec511be6dd9
                             local_useReg = True
                             
                         #check if using dropout
