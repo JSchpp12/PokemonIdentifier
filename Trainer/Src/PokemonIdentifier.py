@@ -1,13 +1,10 @@
-#!/usr/bin/env python
-# coding: utf-8
-
+# %% [markdown]
 # # Pokemon Identifier
 
+# %% [markdown]
 # This is going to train a pokemon identifier that will be trained on several data sources
 
-# In[1]:
-
-
+# %%
 import os
 import sys
 import string
@@ -27,21 +24,16 @@ from tensorflow.keras import regularizers
 import tensorflow_addons as tfa
 from imutils import paths #used to get the paths of all images in a dir
 
-
-# In[2]:
-
-
+# %%
 import matplotlib.pyplot as plt
 
-
+# %% [markdown]
 # ## Global Values
 
-# In[3]:
-
-
+# %%
 clearLogs = False
 strNow = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-ENV = "ubuntuLocal"
+ENV = "windowsLocal"
 
 #path to dataset directory
 ENV_LOG_DIR = f"../Logs/{ENV}/"
@@ -71,50 +63,43 @@ if clearLogs is True and os.path.isdir('../Logs') :
 if os.path.isdir(CORE_DATASET) is False:
     print('DATASET NOT FOUND') 
 
-BATCH_SIZE = 500
+BATCH_SIZE = 250
 
-NUM_EPOCHS = 5
+NUM_EPOCHS = 7
 
 IMAGE_HEIGHT = 80
 IMAGE_WIDTH = 80
 #normalization value that will be used for color channels
-IMAGE_NORM_COLOR = 255 
+IMAGE_NORM_COLOR = 150 
 
-
+# %% [markdown]
 # ### Data Pipeline Params
 
-# In[4]:
-
-
+# %%
 PIPE_USE_RAND_ZOOM = True
-PIPE_RAND_ZOOM_AMT = (-0.10, 0.10)
+PIPE_RAND_ZOOM_AMT = (-0.05, 0.05)
 PIPE_USE_CACHE = False
 PIPE_RATIO_TRAIN = 0.90
 PIPE_RATIO_VALID = 1 - PIPE_RATIO_TRAIN
 
-
+# %% [markdown]
 # ### Training Params
 
-# In[5]:
-
-
-NUM_NODES_IN_CONV = [128]
+# %%
+NUM_NODES_IN_CONV = [32]
 NUM_LAYERS_CONV = [4]
-CONV_KERNEL_SIZE = [(3,3)]
-REGULARIZER_USE = [True]
-REGULARIZER_LEARNING_RATE = 0.001
-USE_BATCH_NORMS = [True, False, True]
-DROPOUT_RATE = [0.0, 0.5, 0.5]    #use same number of elements in list for all dropout args
-DROPOUT_RATE_HIDDEN = [0.0, 0.5, 0.5]
+CONV_KERNEL_SIZE = [(2,2)]
+REGULARIZER_LEARNING_RATE = [float(0.001)]
+USE_BATCH_NORMS = [True]
+DROPOUT_RATE = [0.6]    #use same number of elements in list for all dropout args
+DROPOUT_RATE_HIDDEN = [0.6]
 SPATIAL_DROPOUT_USE = False
 SPATIAL_DROPOUT_RATE = 0.5
 
-
+# %% [markdown]
 # ### Take command line arguments if any
 
-# In[6]:
-
-
+# %%
 if (len(sys.argv) > 0):
     print(sys.argv)
     listArgs = sys.argv
@@ -136,12 +121,13 @@ if (len(sys.argv) > 0):
         elif splitArg[0] == "batchNorm":
             USE_BATCH_NORMS = bool(splitArg[1])
 
-
+# %% [markdown]
 # ## Train
 
+# %% [markdown]
 # ### Create Datasets with TF.Data
 
-# In[7]:
+# %%
 
 
 # #generate training and testing split 
@@ -152,10 +138,7 @@ if (len(sys.argv) > 0):
 #     ("validation", validationPaths, VALIDATION_DIR)
 # ]
 
-
-# In[8]:
-
-
+# %%
 def loadImages(imagePath):
     #encode the image
     # tf.print(imagePath)
@@ -169,10 +152,7 @@ def loadImages(imagePath):
     oneHot = labelParts[-2] == classNames 
     return (image, tf.argmax(oneHot))
 
-
-# In[9]:
-
-
+# %%
 seqAugment = tf.keras.models.Sequential([
     tf.keras.layers.Rescaling(scale=1.0/255),
     tf.keras.layers.RandomZoom(
@@ -182,10 +162,7 @@ seqAugment = tf.keras.models.Sequential([
         fill_value=0)
 ])
 
-
-# In[10]:
-
-
+# %%
 imagePaths = list(paths.list_images(CORE_DATASET))
 random.seed(32)
 random.shuffle(imagePaths)
@@ -226,31 +203,33 @@ valDS = (valDS
          .prefetch(AUTOTUNE)
          )
 
+# %%
+# print(trainPaths[15061])
+for images, labels in trainDS.take(1):
+    for i in range(9):
+        ax = plt.subplot(3, 3, i + 1)
+        plt.imshow((images[i].numpy()*255).astype("uint8"))
+        plt.title(classNames[labels[i]])
+        plt.axis("off")
+    plt.show()
 
-# In[11]:
-
-
-# # print(trainPaths[15061])
-# for images, labels in trainDS.take(1):
-#     for i in range(9):
-#         ax = plt.subplot(3, 3, i + 1)
-#         plt.imshow((images[i].numpy()*255).astype("uint8"))
-#         plt.title(classNames[labels[i]])
-#         plt.axis("off")
-#     plt.show()
-
-
+# %% [markdown]
 # ### Define Model
 
-# In[12]:
-
-
+# %%
+counter = 0
 for useBatchNorms in USE_BATCH_NORMS:
     for numConvLayers in NUM_LAYERS_CONV:
         for convNodes in NUM_NODES_IN_CONV:
             for convKernelSize in CONV_KERNEL_SIZE:
-                for useReg in REGULARIZER_USE:
+                for regIndex in range(0, len(REGULARIZER_LEARNING_RATE)):
                     for dropIndex in range(0, len(DROPOUT_RATE)):
+                        counter += 1
+                        
+                        local_useReg = False
+                        if regIndex is not None and REGULARIZER_LEARNING_RATE[regIndex] > 0.0:
+                            local_useReg = True
+                            
                         #check if using dropout
                         local_useDropout = False #use dropout on layers other than hidden layer 
                         local_useDropout_hidden = False #use dropout on hidden layers
@@ -264,7 +243,7 @@ for useBatchNorms in USE_BATCH_NORMS:
                         if local_useDropout is True or local_useDropout_hidden is True:
                             local_usingAnyDropout = True
 
-                        local_container_dir = os.path.join(SESSION_LOG_DIR, f"cl{numConvLayers}.cn{convNodes}.ckern{convKernelSize}.bnorm{useBatchNorms}.drop{local_usingAnyDropout}.reg{useReg}")
+                        local_container_dir = os.path.join(SESSION_LOG_DIR, f"{counter}.cl{numConvLayers}.cn{convNodes}.ckern{convKernelSize}.bnorm{useBatchNorms}.drop{local_usingAnyDropout}.reg{local_useReg}")
                         local_tensorlogs_dir = os.path.join(local_container_dir, 'fit/')
                         local_save_dir = os.path.join(local_container_dir, 'saves/')
                         local_checkpoint_dir = os.path.join(local_save_dir, 'checkpoints/')
@@ -288,12 +267,12 @@ for useBatchNorms in USE_BATCH_NORMS:
                             file.write(f"Number of nodes per convolution layer: {convNodes} \r")
                             file.write(f"Input size expected: {IMAGE_WIDTH}, {IMAGE_HEIGHT}\r")
                             file.write(f"Epochs: {NUM_EPOCHS}\r")
-                            file.write(f"Regularizers in use? {useReg}\r")
-                            file.write(f"Regularizer learning rate: 0.01\r")
+                            file.write(f"Regularizers in use? {local_useReg}\r")
+                            file.write(f"Regularizer learning rate: {REGULARIZER_LEARNING_RATE[regIndex]}\r")
                             file.write(f"Conv kernel size: {convKernelSize}\r")
                             file.write(f"Use Batch Normalization: {useBatchNorms}\r")
                             file.write(f"Use Dropout: {local_useDropout}\r")
-                            file.write(f"Use Dropout on hidden: {local_useDropout_hidden}")
+                            file.write(f"Use Dropout on hidden: {local_useDropout_hidden}\r")
                             if local_useDropout: 
                                 file.write(f"Dropout rate nonhidden: {DROPOUT_RATE[dropIndex]}\r")
                             if local_useDropout_hidden:
@@ -306,11 +285,11 @@ for useBatchNorms in USE_BATCH_NORMS:
                         #define the model 
                         model = tf.keras.models.Sequential()
                         for i in range(numConvLayers):
-                            if useReg is True:
+                            if local_useReg is True:
                                 model.add(tf.keras.layers.Conv2D(int(convNodes),
                                                                     convKernelSize,
                                                                     activation='relu',
-                                                                    kernel_regularizer=regularizers.l2(REGULARIZER_LEARNING_RATE)))
+                                                                    kernel_regularizer=regularizers.l2(REGULARIZER_LEARNING_RATE[regIndex])))
                             else:
                                 model.add(tf.keras.layers.Conv2D(int(convNodes), convKernelSize, activation='relu'))
 
@@ -379,10 +358,10 @@ for useBatchNorms in USE_BATCH_NORMS:
                             file.close()
 
 
+# %% [markdown]
 # #### Zip Logs For Download
 
-# In[ ]:
-
-
+# %%
 shutil.make_archive('Logs', 'zip', '../Logs')
+
 
