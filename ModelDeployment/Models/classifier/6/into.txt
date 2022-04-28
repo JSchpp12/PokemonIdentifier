@@ -1,0 +1,1 @@
+Number of convolution layers: 3 Number of nodes per convolution layer: 128 Input size expected: 80, 80Epochs: 8Regularizers in use? FalseRegularizer learning rate: 0Conv kernel size: (3, 3)Use Batch Normalization: FalseUse Dropout: FalseUse Dropout on hidden: FalseTraining Complete
