@@ -33,7 +33,7 @@ import matplotlib.pyplot as plt
 # %%
 clearLogs = False
 strNow = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-ENV = "ubuntuLocal"
+ENV = "windowsLocal"
 
 #path to dataset directory
 ENV_LOG_DIR = f"../Logs/{ENV}/"
@@ -63,14 +63,18 @@ if clearLogs is True and os.path.isdir('../Logs') :
 if os.path.isdir(CORE_DATASET) is False:
     print('DATASET NOT FOUND') 
 
-BATCH_SIZE = 255
+BATCH_SIZE = 250
 
-NUM_EPOCHS = 10
+NUM_EPOCHS = 7
 
 IMAGE_HEIGHT = 80
 IMAGE_WIDTH = 80
 #normalization value that will be used for color channels
+<<<<<<< HEAD
+IMAGE_NORM_COLOR = 150 
+=======
 IMAGE_NORM_COLOR = 255 
+>>>>>>> 09ca6b515c8a307dd3bf7e194e10eec511be6dd9
 
 # %% [markdown]
 # ### Data Pipeline Params
@@ -86,13 +90,20 @@ PIPE_RATIO_VALID = 1 - PIPE_RATIO_TRAIN
 # ### Training Params
 
 # %%
-NUM_NODES_IN_CONV = [128]
-NUM_LAYERS_CONV = [3]
-CONV_KERNEL_SIZE = [(3,3)]
-REGULARIZER_LEARNING_RATE = [0.01]
+NUM_NODES_IN_CONV = [32]
+NUM_LAYERS_CONV = [4]
+CONV_KERNEL_SIZE = [(2,2)]
+<<<<<<< HEAD
+REGULARIZER_LEARNING_RATE = [float(0.001)]
 USE_BATCH_NORMS = [True]
-DROPOUT_RATE = [0.4]    #use same number of elements in list for all dropout args
+DROPOUT_RATE = [0.6]    #use same number of elements in list for all dropout args
+DROPOUT_RATE_HIDDEN = [0.6]
+=======
+REGULARIZER_LEARNING_RATE = [0.001]
+USE_BATCH_NORMS = [True]
+DROPOUT_RATE = [0.5]    #use same number of elements in list for all dropout args
 DROPOUT_RATE_HIDDEN = [0.5]
+>>>>>>> 09ca6b515c8a307dd3bf7e194e10eec511be6dd9
 SPATIAL_DROPOUT_USE = False
 SPATIAL_DROPOUT_RATE = 0.5
 
@@ -204,14 +215,14 @@ valDS = (valDS
          )
 
 # %%
-# # print(trainPaths[15061])
-# for images, labels in trainDS.take(1):
-#     for i in range(9):
-#         ax = plt.subplot(3, 3, i + 1)
-#         plt.imshow((images[i].numpy()*255).astype("uint8"))
-#         plt.title(classNames[labels[i]])
-#         plt.axis("off")
-#     plt.show()
+# print(trainPaths[15061])
+for images, labels in trainDS.take(1):
+    for i in range(9):
+        ax = plt.subplot(3, 3, i + 1)
+        plt.imshow((images[i].numpy()*255).astype("uint8"))
+        plt.title(classNames[labels[i]])
+        plt.axis("off")
+    plt.show()
 
 # %% [markdown]
 # ### Define Model
@@ -227,7 +238,11 @@ for useBatchNorms in USE_BATCH_NORMS:
                         counter += 1
                         
                         local_useReg = False
+<<<<<<< HEAD
+                        if regIndex is not None and REGULARIZER_LEARNING_RATE[regIndex] > 0.0:
+=======
                         if regIndex is not None and regIndex != 0:
+>>>>>>> 09ca6b515c8a307dd3bf7e194e10eec511be6dd9
                             local_useReg = True
                             
                         #check if using dropout
@@ -263,10 +278,6 @@ for useBatchNorms in USE_BATCH_NORMS:
                         #write summary to file 
                         infoFile = os.path.join(local_container_dir, "into.txt")
                         with open(infoFile, 'w') as file: 
-                            file.write("Pipeline Info:\r")
-                            if (PIPE_USE_RAND_ZOOM):
-                                file.write("Random zoom amt: {PIPE_RAND_ZOOM_AMT}\r")
-                            file.write("Model Info:\r")
                             file.write(f"Number of convolution layers: {numConvLayers} \r")
                             file.write(f"Number of nodes per convolution layer: {convNodes} \r")
                             file.write(f"Input size expected: {IMAGE_WIDTH}, {IMAGE_HEIGHT}\r")
@@ -293,7 +304,7 @@ for useBatchNorms in USE_BATCH_NORMS:
                                 model.add(tf.keras.layers.Conv2D(int(convNodes),
                                                                     convKernelSize,
                                                                     activation='relu',
-                                                                    kernel_regularizer=regularizers.l2(REGULARIZER_LEARNING_RATE)))
+                                                                    kernel_regularizer=regularizers.l2(REGULARIZER_LEARNING_RATE[regIndex])))
                             else:
                                 model.add(tf.keras.layers.Conv2D(int(convNodes), convKernelSize, activation='relu'))
 
