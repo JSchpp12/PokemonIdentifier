@@ -1,7 +1,1 @@
-*.log
-*.zip
-.ipynb_checkpoints
-Datasets/Images/
-Datasets/Main/
-Logs/
-Tmp/
+/Trainer/Datasets/
